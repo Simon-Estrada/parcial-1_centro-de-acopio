@@ -17,8 +17,7 @@ defmodule CentroAcopio do
     tanques = Datos.tanques()
     entregas_raw = Datos.entregas()
 
-    {entregas_validas, entregas_rechazadas} =
-      procesar_entregas(entregas_raw, productores, tanques)
+    {entregas_validas, entregas_rechazadas} =procesar_entregas(entregas_raw, productores, tanques)
 
     # solicitar entrega adicional (faltante)
     # imprimir reportes R1 al R8 (faltante)
@@ -86,7 +85,7 @@ defmodule CentroAcopio do
     resumen_dias =
       entregas_validas
       |> entregas_del_productor(productor)
-      |> resumir_por_dia
+      |> resumir_por_dia()
 
     totales = calcular_totales(resumen_dias)
 
@@ -98,7 +97,7 @@ defmodule CentroAcopio do
 
     %{
       productor: productor,
-      desglose_dias: desglose_dias,
+      resumen_dias: resumen_dias,
       total_litros: totales.litros,
       total_valor_entregas: totales.valor_entregas,
       total_bonificaciones: totales.bonificaciones,
@@ -120,7 +119,7 @@ defmodule CentroAcopio do
   end
 
   defp resumen_dia(dia, entregas) do
-    acumulador_inicial = %{litros: 0, valor: 0}
+    acumulador_inicial = %{litros: 0, valor: 0.0}
 
     totales_dia =
       Enum.reduce(entregas, acumulador_inicial, fn entrega, acc ->
@@ -138,11 +137,11 @@ defmodule CentroAcopio do
     }
   end
 
-  defp calcular_bonificacio(litros) when litros >= @litros_bonificacion, do: @bonificacion_diaria
+  defp calcular_bonificacion(litros) when litros >= @litros_bonificacion, do: @bonificacion_diaria
   defp calcular_bonificacion(_litros), do: 0
 
   defp calcular_totales(resumen_dias) do
-    acumulador_inicial = %{litro: 0, valor_entregas: 0, bonificaciones: 0}
+    acumulador_inicial = %{litros: 0, valor_entregas: 0.0, bonificaciones: 0}
 
     Enum.reduce(resumen_dias, acumulador_inicial, fn dia, acc ->
       %{
@@ -153,25 +152,63 @@ defmodule CentroAcopio do
     end)
   end
 
-  defp calcular_descuento_transporte(%{transporte: true}, dias) when dias > 0, do:
-  dias * @costo_transporte
+  defp calcular_descuento_transporte(%{transporte: true}, dias) when dias > 0,
+    do: dias * @costo_transporte
+
   defp calcular_descuento_transporte(_producto, _dias), do: 0
 
   def solicitar_comprobante(productores, entregas) do
-    IO.puts("\n--- COMPROBANTE DEL PRODUCTOR ---")
-    codigo = IO.gets("Ingrese el codigo del productor: ") |> String.trim()
+    "\n=====================================
+        COMPROBANTE DEL PRODUCTOR
+====================================="
+    |> Util.mostrar_mensaje()
+
+    codigo = Util.ingresar("Ingrese el codigo del productor: ")
 
     case Enum.find(productores, fn p -> p.codigo == codigo end) do
       nil ->
-        IO.puts("Error: Productor con codigo #{codigo} no existe.")
+        "\nError: El productor con codigo '#{codigo}' no existe en el sistema."
+        |> Util.mostrar_mensaje()
 
       productor ->
         mostrar_comprobante(productor, entregas)
     end
   end
 
-  defp mostrar_comprobante(productor, entregas) do
-    IO.puts("\n--- COMPROBANTE DEL PRODUCTOR #{productor.nombre} (#{productor.codigo}) ---")
+  defp mostrar_comprobante(productor, entregas_validas) do
+    liq = liquidar_productor(productor, entregas_validas)
+
+    "\n--------------------------------
+    NOMBRE: #{productor.nombre}
+    CODIGO: #{productor.codigo}
+    SERVICIO TRANSPORTE: #{if productor.transporte, do: "si", else: "no"}
+--------------------------------"
+    |> Util.mostrar_mensaje()
+
+    "\n--------------------------------
+    DETALLE DIARIO DE ENTREGAS VALIDAS:"
+    |> Util.mostrar_mensaje()
+
+    if Enum.empty?(liq.resumen_dias) do
+      "  (El productor no registró entregas válidas en la semana)"
+      |> Util.mostrar_mensaje()
+    else
+      Enum.each(liq.resumen_dias, fn d ->
+        "* Día #{d.dia}: #{d.litros} L | Valor entregas: $#{Float.round(d.valor_entregas, 2)} | Bonificación: $#{d.bonificacion}"
+        |> Util.mostrar_mensaje()
+      end)
+    end
+
+    "\n--------------------------------
+    RESUMEN DE LIQUIDACION:
+     - Total litros entregados: #{liq.total_litros} L
+     - Total valor de entregas : $#{Util.formatear_moneda(liq.total_valor_entregas)}
+     - Total bonificaciones    : $#{liq.total_bonificaciones}
+     - Descuento por transporte: -$#{liq.descuento_transporte}
+--------------------------------
+    NETO A PAGAR            : $#{Util.formatear_moneda(liq.neto_a_pagar)}
+    ==========================================\n"
+    |> Util.mostrar_mensaje()
   end
 end
 
