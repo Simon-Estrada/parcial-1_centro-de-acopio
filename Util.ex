@@ -32,6 +32,9 @@ defmodule Util do
     |> String.upcase()
   end
 
+  @doc """
+  Formatea un valor numérico como moneda, con dos decimales si es float.
+  """
   def formatear_moneda(valor) when is_float(valor) do
     :erlang.float_to_binary(valor, decimals: 2)
   end
