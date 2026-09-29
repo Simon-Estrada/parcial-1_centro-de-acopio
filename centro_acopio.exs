@@ -2,7 +2,24 @@ Code.require_file("datos.exs")
 
 defmodule CentroAcopio do
   @moduledoc """
-  Módulo principal que representa el centro de acopio de leche.
+  ## Información del Proyecto
+  - autor: Simon Lopez E, Luna Sofia Oviedo Rios, David Alejandro Henao Jaramillo
+  - fecha: septiembre del 2026
+  - licencia: GNU GPL v3
+  Centro de acopio de leche: valida las entregas semanales de los productores,
+  calcula la liquidación de cada uno y muestra su comprobante.
+
+  ## Organización
+
+  * Funciones puras (sin E/S): `procesar_entregas/3`, `validar_entrega/3`,
+    `calcular_valor_entrega/1` y `liquidar_productor/2`.
+  * Funciones impuras (leen o escriben en consola): `main/0`,
+    `solicitar_comprobante/2` y `mostrar_comprobante/2`.
+
+  Toda iteración se hace con `Enum` o comprehensions `for`; no se usa
+  recursividad manual, `defstruct` ni procesos.
+
+
   """
   @tarifa_base 1800
   @meta_diaria_centro 2000
@@ -25,6 +42,10 @@ defmodule CentroAcopio do
     solicitar_comprobante(productores, entregas_validas)
   end
 
+  @doc """
+  Procesa la lista de entregas, validando cada una y separándolas en válidas y rechazadas.
+  Retorna una tupla con dos listas: {entregas_validas, entregas_rechazadas}. Uno de los requisitos del parcial
+  """
   def procesar_entregas(entregas, productores, tanques) do
     Enum.reduce(entregas, {[], []}, fn entrega, {validas, rechazadas} ->
       case validar_entrega(entrega, productores, tanques) do
@@ -34,6 +55,10 @@ defmodule CentroAcopio do
     end)
   end
 
+  @doc """
+  Valida una entrega según las reglas de negocio y retorna un resultado.
+  Retorna `{:ok, entrega}` si es válida, o `{:error, motivo}` si es inválida.
+  """
   def validar_entrega(entrega, productores, tanques) do
     with :ok <- validar_productor(entrega.productor, productores),
          :ok <- validar_tanque(entrega.tanque, tanques),
@@ -67,6 +92,16 @@ defmodule CentroAcopio do
   defp validar_grasa(grasa) when is_number(grasa) and grasa >= 0 and grasa <= 15, do: :ok
   defp validar_grasa(_), do: {:error, :porcentaje_invalido}
 
+  @doc """
+  Calcula el valor de una entrega: `litros * tarifa_base`, ajustado según la grasa.
+
+  Ajuste por porcentaje de grasa:
+
+  * grasa >= 3.5 → +6 %
+  * grasa >= 3.0 → sin ajuste
+  * grasa >= 2.5 → -8 %
+  * grasa menor → -20 %
+  """
   def calcular_valor_entrega(entrega) do
     valor_base = entrega.litros * @tarifa_base
 
@@ -81,6 +116,13 @@ defmodule CentroAcopio do
     valor_base * (1 + ajuste_segun_grasa)
   end
 
+   @doc """
+  Calcula la liquidación semanal de un productor a partir de las entregas válidas.
+
+  Devuelve un mapa con el resumen por día, los totales de litros, valor y
+  bonificaciones, el descuento de transporte y el neto a pagar
+  (`valor entregas + bonificaciones - descuento de transporte`).
+  """
   def liquidar_productor(productor, entregas_validas) do
     resumen_dias =
       entregas_validas
@@ -155,8 +197,14 @@ defmodule CentroAcopio do
   defp calcular_descuento_transporte(%{transporte: true}, dias) when dias > 0,
     do: dias * @costo_transporte
 
-  defp calcular_descuento_transporte(_producto, _dias), do: 0
+  defp calcular_descuento_transporte(_productor, _dias), do: 0
 
+  @doc """
+  Pide por consola el código de un productor y muestra su comprobante.
+
+  Si el código no existe, muestra un mensaje de error.
+  Es una función impura porque lee de teclado y escribe en pantalla.
+  """
   def solicitar_comprobante(productores, entregas) do
     "\n=====================================
         COMPROBANTE DEL PRODUCTOR
@@ -194,7 +242,7 @@ defmodule CentroAcopio do
       |> Util.mostrar_mensaje()
     else
       Enum.each(liq.resumen_dias, fn d ->
-        "* Día #{d.dia}: #{d.litros} L | Valor entregas: $#{Float.round(d.valor_entregas, 2)} | Bonificación: $#{d.bonificacion}"
+        "* Día #{d.dia}: #{d.litros} L | Valor entregas: $#{Util.formatear_moneda(d.valor_entregas)} | Bonificación: $#{d.bonificacion}"
         |> Util.mostrar_mensaje()
       end)
     end

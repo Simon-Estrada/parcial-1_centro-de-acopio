@@ -29,6 +29,7 @@ defmodule Util do
     mensaje
     |> IO.gets()
     |> String.trim()
+    |> String.upcase()
   end
 
   def formatear_moneda(valor) when is_float(valor) do
