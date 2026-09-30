@@ -36,6 +36,8 @@ defmodule Reportes do
   recursividad manual, `defstruct` ni procesos.
   """
 
+  @meta_diaria_centro 2000
+  @dias_recepcion 1..6
   @motivos_rechazo [
     :productor_desconocido,
     :tanque_desconocido,
@@ -60,6 +62,7 @@ defmodule Reportes do
   def generar_reportes(validas, rechazadas, _productores, tanques, _liquidaciones) do
     rechazadas |> r1() |> imprimir_r1()
     validas |> r2(tanques) |> imprimir_r2()
+    validas |> r3() |> imprimir_r3()
   end
 
   # ------------------------------------------------------------------ R1
@@ -174,8 +177,79 @@ defmodule Reportes do
     end)
   end
 
+  # ------------------------------------------------------------------ R3
+
+  @doc """
+  R3. Calcula los litros recibidos por día y si se alcanzó la meta diaria.
+
+  Incluye siempre los 6 días de recepción, con 0 litros si no hubo entregas.
+
+  ## Parámetros
+
+    - `validas`: entregas válidas (usa `:dia` y `:litros`).
+
+  ## Retorno
+
+  Mapa con:
+
+    * `:litros`: mapa `dia => litros`. Es el mapa que se usa en la
+      investigación de `Map.merge/3`, por eso conserva la forma
+      `%{1 => ..., 2 => ...}`.
+    * `:cumple`: mapa `dia => true | false`.
+    * `:todos`: `true` si la meta se cumplió todos los días.
+    * `:alguno`: `true` si la meta se cumplió al menos un día.
+
+  ## Ejemplos
+
+      iex> resultado = Reportes.r3([%{dia: 1, litros: 2500}, %{dia: 2, litros: 100}])
+      iex> resultado.litros[1]
+      2500
+      iex> resultado.litros[6]
+      0
+      iex> resultado.cumple[1]
+      true
+      iex> {resultado.todos, resultado.alguno}
+      {false, true}
+
+  """
+  def r3(validas) do
+    por_dia =
+      Enum.reduce(validas, %{}, fn e, acc ->
+        Map.update(acc, e.dia, e.litros, fn actual -> actual + e.litros end)
+      end)
+
+    litros = for dia <- @dias_recepcion, into: %{}, do: {dia, Map.get(por_dia, dia, 0)}
+    cumple = for {dia, l} <- litros, into: %{}, do: {dia, l >= @meta_diaria_centro}
+    resultados = Map.values(cumple)
+
+    %{
+      litros: litros,
+      cumple: cumple,
+      todos: Enum.all?(resultados),
+      alguno: Enum.any?(resultados)
+    }
+  end
+
+  @doc """
+  Imprime el reporte R3 a partir del resultado de `r3/1`.
+  """
+  def imprimir_r3(%{litros: litros, cumple: cumple, todos: todos, alguno: alguno}) do
+    Util.mostrar_mensaje("\n=== R3: LITROS POR DÍA (meta: #{@meta_diaria_centro} L) ===")
+
+    Enum.each(@dias_recepcion, fn dia ->
+      estado = if cumple[dia], do: "cumple la meta", else: "no cumple la meta"
+      Util.mostrar_mensaje("  Día #{dia}: #{litros[dia]} L -> #{estado}")
+    end)
+
+    Util.mostrar_mensaje("\n  ¿Se cumplió la meta todos los días? #{si_no(todos)}")
+    Util.mostrar_mensaje("  ¿Se cumplió la meta al menos un día? #{si_no(alguno)}")
+  end
+
   # ------------------------------------------------------- Auxiliares
 
   # Redondea a dos decimales; * 1.0 evita error si el valor es entero.
   defp redondear(valor), do: Float.round(valor * 1.0, 2)
+
+  defp si_no(true), do: "sí"
+  defp si_no(false), do: "no"
 end
