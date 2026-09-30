@@ -57,8 +57,9 @@ defmodule Reportes do
     - `tanques`: lista de tanques.
     - `liquidaciones`: una liquidación por cada productor.
   """
-  def generar_reportes(_validas, rechazadas, _productores, _tanques, _liquidaciones) do
+  def generar_reportes(validas, rechazadas, _productores, tanques, _liquidaciones) do
     rechazadas |> r1() |> imprimir_r1()
+    validas |> r2(tanques) |> imprimir_r2()
   end
 
   # ------------------------------------------------------------------ R1
@@ -120,4 +121,61 @@ defmodule Reportes do
       Util.mostrar_mensaje("  #{motivo}: #{conteo[motivo]}")
     end)
   end
+
+  # ------------------------------------------------------------------ R2
+
+  @doc """
+  R2. Calcula los litros almacenados por tanque y su porcentaje de ocupación.
+
+  Recorre la lista de **tanques** (no la de entregas) para que un tanque sin
+  entregas válidas aparezca con 0 litros. El resultado queda ordenado de
+  mayor a menor ocupación.
+
+  ## Parámetros
+
+    - `validas`: entregas válidas (usa `:tanque` y `:litros`).
+    - `tanques`: lista de tanques (usa `:id`, `:nombre` y `:capacidad`).
+
+  ## Ejemplos
+
+      iex> validas = [%{tanque: "T1", litros: 500}]
+      iex> tanques = [%{id: "T2", nombre: "Centro", capacidad: 4000},
+      ...>            %{id: "T1", nombre: "Norte", capacidad: 5000}]
+      iex> filas = Reportes.r2(validas, tanques)
+      iex> Enum.map(filas, fn f -> {f.id, f.litros, f.ocupacion} end)
+      [{"T1", 500, 10.0}, {"T2", 0, 0.0}]
+
+  """
+  def r2(validas, tanques) do
+    litros_por_tanque =
+      Enum.reduce(validas, %{}, fn e, acc ->
+        Map.update(acc, e.tanque, e.litros, fn actual -> actual + e.litros end)
+      end)
+
+    filas =
+      for t <- tanques do
+        litros = Map.get(litros_por_tanque, t.id, 0)
+        %{id: t.id, nombre: t.nombre, litros: litros, ocupacion: litros / t.capacidad * 100}
+      end
+
+    Enum.sort_by(filas, fn f -> f.ocupacion end, :desc)
+  end
+
+  @doc """
+  Imprime el reporte R2 a partir del resultado de `r2/2`.
+  """
+  def imprimir_r2(filas) do
+    Util.mostrar_mensaje("\n=== R2: OCUPACIÓN DE TANQUES ===")
+
+    Enum.each(filas, fn f ->
+      Util.mostrar_mensaje(
+        "  #{f.nombre} (#{f.id}): #{f.litros} L | #{redondear(f.ocupacion)} % de ocupación"
+      )
+    end)
+  end
+
+  # ------------------------------------------------------- Auxiliares
+
+  # Redondea a dos decimales; * 1.0 evita error si el valor es entero.
+  defp redondear(valor), do: Float.round(valor * 1.0, 2)
 end
