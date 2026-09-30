@@ -67,6 +67,7 @@ defmodule Reportes do
     liquidaciones |> r4() |> imprimir_r4()
     validas |> r5(productores) |> imprimir_r5()
     validas |> r6(productores) |> imprimir_r6()
+    liquidaciones |> r7() |> imprimir_r7()
   end
 
   # ------------------------------------------------------------------ R1
@@ -502,6 +503,48 @@ defmodule Reportes do
       "  #{g.nombre} (#{g.codigo}): #{redondear(g.grasa_ponderada)} % de grasa ponderada " <>
         "(#{g.entregas} entregas, #{g.litros} L)"
     )
+  end
+
+  # ------------------------------------------------------------------ R7
+
+  @doc """
+  R7. Calcula el total pagado por el centro en la semana y el costo promedio
+  pagado por litro.
+
+  El total pagado es la suma del **neto a pagar** de todos los productores.
+  El costo por litro es ese total dividido entre los litros válidos recibidos
+  (0.0 si no hubo litros).
+
+  ## Parámetros
+
+    - `liquidaciones`: lista de resultados de `CentroAcopio.liquidar_productor/2`.
+
+  ## Ejemplos
+
+      iex> liquidaciones = [
+      ...>   %{neto_a_pagar: 1000.0, total_litros: 10},
+      ...>   %{neto_a_pagar: 3000.0, total_litros: 30}
+      ...> ]
+      iex> Reportes.r7(liquidaciones)
+      %{total_pagado: 4000.0, total_litros: 40, costo_por_litro: 100.0}
+
+  """
+  def r7(liquidaciones) do
+    total_pagado = liquidaciones |> Enum.map(fn liq -> liq.neto_a_pagar end) |> Enum.sum()
+    total_litros = liquidaciones |> Enum.map(fn liq -> liq.total_litros end) |> Enum.sum()
+    costo_por_litro = if total_litros > 0, do: total_pagado / total_litros, else: 0.0
+
+    %{total_pagado: total_pagado, total_litros: total_litros, costo_por_litro: costo_por_litro}
+  end
+
+  @doc """
+  Imprime el reporte R7 a partir del resultado de `r7/1`.
+  """
+  def imprimir_r7(%{total_pagado: total, total_litros: litros, costo_por_litro: costo}) do
+    Util.mostrar_mensaje("\n=== R7: TOTALES DE LA SEMANA ===")
+    Util.mostrar_mensaje("  Total pagado por el centro: $#{Util.formatear_moneda(total)}")
+    Util.mostrar_mensaje("  Litros válidos recibidos  : #{litros} L")
+    Util.mostrar_mensaje("  Costo promedio por litro  : $#{Util.formatear_moneda(costo * 1.0)}")
   end
 
   # ------------------------------------------------------- Auxiliares
