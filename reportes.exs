@@ -68,6 +68,7 @@ defmodule Reportes do
     validas |> r5(productores) |> imprimir_r5()
     validas |> r6(productores) |> imprimir_r6()
     liquidaciones |> r7() |> imprimir_r7()
+    validas |> r8(productores, tanques) |> imprimir_r8()
   end
 
   # ------------------------------------------------------------------ R1
@@ -545,6 +546,54 @@ defmodule Reportes do
     Util.mostrar_mensaje("  Total pagado por el centro: $#{Util.formatear_moneda(total)}")
     Util.mostrar_mensaje("  Litros válidos recibidos  : #{litros} L")
     Util.mostrar_mensaje("  Costo promedio por litro  : $#{Util.formatear_moneda(costo * 1.0)}")
+  end
+
+  # ------------------------------------------------------------------ R8
+
+  @doc """
+  R8. Encuentra los productores que hicieron al menos una entrega válida en
+  **todos** los tanques.
+
+  ## Parámetros
+
+    - `validas`: entregas válidas.
+    - `productores`: lista de productores.
+    - `tanques`: lista de tanques.
+
+  ## Ejemplos
+
+      iex> productores = [%{codigo: "P01", nombre: "Ana"}, %{codigo: "P02", nombre: "Beto"}]
+      iex> tanques = [%{id: "T1"}, %{id: "T2"}]
+      iex> validas = [
+      ...>   %{productor: "P01", tanque: "T1"},
+      ...>   %{productor: "P01", tanque: "T2"},
+      ...>   %{productor: "P02", tanque: "T1"}
+      ...> ]
+      iex> Enum.map(Reportes.r8(validas, productores, tanques), fn p -> p.codigo end)
+      ["P01"]
+
+  """
+  def r8(validas, productores, tanques) do
+    Enum.filter(productores, fn p ->
+      Enum.all?(tanques, fn t ->
+        Enum.any?(validas, fn e -> e.productor == p.codigo and e.tanque == t.id end)
+      end)
+    end)
+  end
+
+  @doc """
+  Imprime el reporte R8 a partir del resultado de `r8/3`.
+  """
+  def imprimir_r8(productores) do
+    Util.mostrar_mensaje("\n=== R8: PRODUCTORES PRESENTES EN TODOS LOS TANQUES ===")
+
+    if productores == [] do
+      Util.mostrar_mensaje("  Ningún productor entregó en todos los tanques.")
+    else
+      Enum.each(productores, fn p ->
+        Util.mostrar_mensaje("  #{p.nombre} (#{p.codigo})")
+      end)
+    end
   end
 
   # ------------------------------------------------------- Auxiliares
