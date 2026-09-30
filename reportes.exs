@@ -1,4 +1,4 @@
-# Integrantes: Simon Lopez E, Luna Sofia Oviedo Rios, David Alejandro Henao Jaramillo
+# Integrantes: Simon Lopez Estrada, Luna Sofia Oviedo Rios, David Alejandro Henao Jaramillo
 
 defmodule Reportes do
   @moduledoc """
@@ -59,10 +59,11 @@ defmodule Reportes do
     - `tanques`: lista de tanques.
     - `liquidaciones`: una liquidación por cada productor.
   """
-  def generar_reportes(validas, rechazadas, _productores, tanques, _liquidaciones) do
+  def generar_reportes(validas, rechazadas, _productores, tanques, liquidaciones) do
     rechazadas |> r1() |> imprimir_r1()
     validas |> r2(tanques) |> imprimir_r2()
     validas |> r3() |> imprimir_r3()
+    liquidaciones |> r4() |> imprimir_r4()
   end
 
   # ------------------------------------------------------------------ R1
@@ -243,6 +244,58 @@ defmodule Reportes do
 
     Util.mostrar_mensaje("\n  ¿Se cumplió la meta todos los días? #{si_no(todos)}")
     Util.mostrar_mensaje("  ¿Se cumplió la meta al menos un día? #{si_no(alguno)}")
+  end
+
+  # ------------------------------------------------------------------ R4
+
+  @doc """
+  R4. Ordena la liquidación de todos los productores por pago neto, de mayor
+  a menor, y les asigna su posición.
+
+  Los productores sin entregas válidas también aparecen (con neto 0).
+
+  ## Parámetros
+
+    - `liquidaciones`: lista de resultados de `CentroAcopio.liquidar_productor/2`.
+
+  ## Retorno
+
+  Lista de tuplas `{liquidacion, posicion}`, con la posición desde 1.
+
+  ## Ejemplos
+
+      iex> liquidaciones = [
+      ...>   %{productor: %{nombre: "Ana"}, neto_a_pagar: 100.0},
+      ...>   %{productor: %{nombre: "Beto"}, neto_a_pagar: 300.0}
+      ...> ]
+      iex> [{primero, 1}, {segundo, 2}] = Reportes.r4(liquidaciones)
+      iex> {primero.productor.nombre, segundo.productor.nombre}
+      {"Beto", "Ana"}
+
+  """
+  def r4(liquidaciones) do
+    liquidaciones
+    |> Enum.sort_by(fn liq -> liq.neto_a_pagar end, :desc)
+    |> Enum.with_index(1)
+  end
+
+  @doc """
+  Imprime el reporte R4 a partir del resultado de `r4/1`.
+  """
+  def imprimir_r4(liquidaciones_numeradas) do
+    Util.mostrar_mensaje("\n=== R4: LIQUIDACIÓN DE PRODUCTORES (por pago neto) ===")
+
+    Enum.each(liquidaciones_numeradas, fn {liq, posicion} ->
+      nombre = String.pad_trailing(liq.productor.nombre, 20)
+
+      Util.mostrar_mensaje(
+        "  #{posicion}. #{nombre} | #{liq.total_litros} L" <>
+          " | Entregas: $#{Util.formatear_moneda(liq.total_valor_entregas)}" <>
+          " | Bonif.: $#{Util.formatear_moneda(liq.total_bonificaciones)}" <>
+          " | Transp.: -$#{Util.formatear_moneda(liq.descuento_transporte)}" <>
+          " | NETO: $#{Util.formatear_moneda(liq.neto_a_pagar)}"
+      )
+    end)
   end
 
   # ------------------------------------------------------- Auxiliares
