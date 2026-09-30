@@ -1,4 +1,4 @@
-# Integrantes: Simon Lopez Estrada, Luna Sofia Oviedo Rios, David Alejandro Henao Jaramillo
+# Integrantes: Simon Lopez E, Luna Sofia Oviedo Rios, David Alejandro Henao Jaramillo
 
 defmodule Reportes do
   @moduledoc """
@@ -59,11 +59,12 @@ defmodule Reportes do
     - `tanques`: lista de tanques.
     - `liquidaciones`: una liquidación por cada productor.
   """
-  def generar_reportes(validas, rechazadas, _productores, tanques, liquidaciones) do
+  def generar_reportes(validas, rechazadas, productores, tanques, liquidaciones) do
     rechazadas |> r1() |> imprimir_r1()
     validas |> r2(tanques) |> imprimir_r2()
     validas |> r3() |> imprimir_r3()
     liquidaciones |> r4() |> imprimir_r4()
+    validas |> r5(productores) |> imprimir_r5()
   end
 
   # ------------------------------------------------------------------ R1
@@ -298,6 +299,120 @@ defmodule Reportes do
     end)
   end
 
+  # ------------------------------------------------------------------ R5
+
+  @doc """
+  R5. Encuentra el productor con más litros entregados en cada día.
+
+  Si hay empate en un día, aparecen todos los empatados. Un día sin entregas
+  queda con lista de líderes vacía. Al final determina quién fue líder en
+  más días (con empates, aparecen todos).
+
+  ## Parámetros
+
+    - `validas`: entregas válidas.
+    - `productores`: lista de productores (para obtener los nombres).
+
+  ## Retorno
+
+  Mapa con:
+
+    * `:por_dia`: mapa `dia => %{litros: maximo, lideres: [{codigo, nombre}]}`.
+    * `:mas_dias`: mapa `%{lideres: [{codigo, nombre}], dias: cantidad}`.
+
+  ## Ejemplos
+
+      iex> productores = [%{codigo: "P01", nombre: "Ana"}, %{codigo: "P02", nombre: "Beto"}]
+      iex> validas = [
+      ...>   %{productor: "P01", dia: 1, litros: 100},
+      ...>   %{productor: "P02", dia: 1, litros: 100},
+      ...>   %{productor: "P01", dia: 2, litros: 50}
+      ...> ]
+      iex> resultado = Reportes.r5(validas, productores)
+      iex> resultado.por_dia[1].lideres
+      [{"P01", "Ana"}, {"P02", "Beto"}]
+      iex> resultado.por_dia[3].lideres
+      []
+      iex> resultado.mas_dias
+      %{lideres: [{"P01", "Ana"}], dias: 2}
+
+  """
+  def r5(validas, productores) do
+    nombres = Map.new(productores, fn p -> {p.codigo, p.nombre} end)
+
+    por_dia =
+      for dia <- @dias_recepcion, into: %{} do
+        litros_por_productor =
+          validas
+          |> Enum.filter(fn e -> e.dia == dia end)
+          |> Enum.reduce(%{}, fn e, acc ->
+            Map.update(acc, e.productor, e.litros, fn actual -> actual + e.litros end)
+          end)
+
+        {dia, lideres_del_dia(litros_por_productor, nombres)}
+      end
+
+    %{por_dia: por_dia, mas_dias: lideres_de_la_semana(por_dia)}
+  end
+
+  # Líderes de un día: los productores cuyo total iguala el máximo del día.
+  defp lideres_del_dia(litros_por_productor, _nombres) when map_size(litros_por_productor) == 0,
+    do: %{litros: 0, lideres: []}
+
+  defp lideres_del_dia(litros_por_productor, nombres) do
+    maximo = litros_por_productor |> Map.values() |> Enum.max()
+
+    lideres =
+      for {codigo, litros} <- litros_por_productor, litros == maximo do
+        {codigo, Map.get(nombres, codigo, codigo)}
+      end
+
+    %{litros: maximo, lideres: Enum.sort(lideres)}
+  end
+
+  # Cuenta en cuántos días fue líder cada productor y toma el máximo.
+  # Un empate en un día suma un día a cada uno de los empatados.
+  defp lideres_de_la_semana(por_dia) do
+    dias_como_lider =
+      por_dia
+      |> Map.values()
+      |> Enum.flat_map(fn dia -> dia.lideres end)
+      |> Enum.frequencies()
+
+    if map_size(dias_como_lider) == 0 do
+      %{lideres: [], dias: 0}
+    else
+      maximo = dias_como_lider |> Map.values() |> Enum.max()
+      lideres = for {lider, dias} <- dias_como_lider, dias == maximo, do: lider
+      %{lideres: Enum.sort(lideres), dias: maximo}
+    end
+  end
+
+  @doc """
+  Imprime el reporte R5 a partir del resultado de `r5/2`.
+  """
+  def imprimir_r5(%{por_dia: por_dia, mas_dias: mas_dias}) do
+    Util.mostrar_mensaje("\n=== R5: LÍDER DE LITROS POR DÍA ===")
+
+    Enum.each(@dias_recepcion, fn dia ->
+      %{litros: litros, lideres: lideres} = por_dia[dia]
+
+      if lideres == [] do
+        Util.mostrar_mensaje("  Día #{dia}: sin entregas válidas")
+      else
+        Util.mostrar_mensaje("  Día #{dia}: #{texto_lideres(lideres)} con #{litros} L")
+      end
+    end)
+
+    if mas_dias.lideres == [] do
+      Util.mostrar_mensaje("\n  Ningún productor lideró un día.")
+    else
+      Util.mostrar_mensaje(
+        "\n  Primer lugar en más días: #{texto_lideres(mas_dias.lideres)} (#{mas_dias.dias} días)"
+      )
+    end
+  end
+
   # ------------------------------------------------------- Auxiliares
 
   # Redondea a dos decimales; * 1.0 evita error si el valor es entero.
@@ -305,4 +420,11 @@ defmodule Reportes do
 
   defp si_no(true), do: "sí"
   defp si_no(false), do: "no"
+
+  # Convierte [{"P01", "Ana"}, {"P02", "Beto"}] en "Ana (P01), Beto (P02)".
+  defp texto_lideres(lideres) do
+    lideres
+    |> Enum.map(fn {codigo, nombre} -> "#{nombre} (#{codigo})" end)
+    |> Enum.join(", ")
+  end
 end
