@@ -38,6 +38,7 @@ defmodule Reportes do
 
   @meta_diaria_centro 2000
   @dias_recepcion 1..6
+  @minimo_entregas_calidad 3
   @motivos_rechazo [
     :productor_desconocido,
     :tanque_desconocido,
@@ -65,6 +66,7 @@ defmodule Reportes do
     validas |> r3() |> imprimir_r3()
     liquidaciones |> r4() |> imprimir_r4()
     validas |> r5(productores) |> imprimir_r5()
+    validas |> r6(productores) |> imprimir_r6()
   end
 
   # ------------------------------------------------------------------ R1
@@ -411,6 +413,95 @@ defmodule Reportes do
         "\n  Primer lugar en más días: #{texto_lideres(mas_dias.lideres)} (#{mas_dias.dias} días)"
       )
     end
+  end
+
+  # ------------------------------------------------------------------ R6
+
+  @doc """
+  R6. Encuentra el productor con mejor calidad entre quienes tengan al menos
+  #{@minimo_entregas_calidad} entregas válidas.
+
+  La calidad es el porcentaje de grasa **ponderado por litros**:
+
+      suma(grasa * litros) / suma(litros)
+
+  También se calcula el promedio simple de los porcentajes, para poder
+  compararlos en la explicación del informe.
+
+  ## Parámetros
+
+    - `validas`: entregas válidas.
+    - `productores`: lista de productores (para obtener los nombres).
+
+  ## Retorno
+
+  Mapa con `:ganador` (el mejor candidato, o `nil` si nadie califica) y
+  `:candidatos` (todos los que califican, de mejor a peor). Cada candidato
+  es un mapa con `:codigo`, `:nombre`, `:entregas`, `:litros`,
+  `:grasa_ponderada` y `:grasa_simple`.
+
+  ## Ejemplos
+
+      iex> productores = [%{codigo: "P01", nombre: "Ana"}]
+      iex> validas = [
+      ...>   %{productor: "P01", litros: 10, grasa: 4.0},
+      ...>   %{productor: "P01", litros: 500, grasa: 3.0},
+      ...>   %{productor: "P01", litros: 10, grasa: 3.0}
+      ...> ]
+      iex> ganador = Reportes.r6(validas, productores).ganador
+      iex> {Float.round(ganador.grasa_ponderada, 2), Float.round(ganador.grasa_simple, 2)}
+      {3.02, 3.33}
+      iex> Reportes.r6(Enum.take(validas, 2), productores).ganador
+      nil
+
+  """
+  def r6(validas, productores) do
+    nombres = Map.new(productores, fn p -> {p.codigo, p.nombre} end)
+
+    candidatos =
+      validas
+      |> Enum.group_by(fn e -> e.productor end)
+      |> Enum.filter(fn {_codigo, entregas} -> length(entregas) >= @minimo_entregas_calidad end)
+      |> Enum.map(fn {codigo, entregas} -> calidad_productor(codigo, nombres, entregas) end)
+      |> Enum.sort_by(fn c -> c.grasa_ponderada end, :desc)
+
+    %{ganador: List.first(candidatos), candidatos: candidatos}
+  end
+
+  # Calcula la grasa ponderada y la grasa simple de un productor.
+  defp calidad_productor(codigo, nombres, entregas) do
+    litros = entregas |> Enum.map(fn e -> e.litros end) |> Enum.sum()
+    grasa_por_litros = entregas |> Enum.map(fn e -> e.grasa * e.litros end) |> Enum.sum()
+    suma_grasas = entregas |> Enum.map(fn e -> e.grasa end) |> Enum.sum()
+
+    %{
+      codigo: codigo,
+      nombre: Map.get(nombres, codigo, codigo),
+      entregas: length(entregas),
+      litros: litros,
+      grasa_ponderada: grasa_por_litros / litros,
+      grasa_simple: suma_grasas / length(entregas)
+    }
+  end
+
+  @doc """
+  Imprime el reporte R6 a partir del resultado de `r6/2`.
+  """
+  def imprimir_r6(%{ganador: nil}) do
+    Util.mostrar_mensaje("\n=== R6: MEJOR CALIDAD DE LECHE ===")
+
+    Util.mostrar_mensaje(
+      "  Ningún productor tiene al menos #{@minimo_entregas_calidad} entregas válidas."
+    )
+  end
+
+  def imprimir_r6(%{ganador: g}) do
+    Util.mostrar_mensaje("\n=== R6: MEJOR CALIDAD DE LECHE ===")
+
+    Util.mostrar_mensaje(
+      "  #{g.nombre} (#{g.codigo}): #{redondear(g.grasa_ponderada)} % de grasa ponderada " <>
+        "(#{g.entregas} entregas, #{g.litros} L)"
+    )
   end
 
   # ------------------------------------------------------- Auxiliares
