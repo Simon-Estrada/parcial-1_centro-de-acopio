@@ -259,5 +259,4 @@ defmodule CentroAcopio do
     |> Util.mostrar_mensaje()
   end
 end
-
 CentroAcopio.main()
