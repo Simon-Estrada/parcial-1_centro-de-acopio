@@ -1,4 +1,5 @@
 Code.require_file("datos.exs")
+Code.require_file("reportes.exs")
 
 defmodule CentroAcopio do
   @moduledoc """
@@ -34,10 +35,23 @@ defmodule CentroAcopio do
     tanques = Datos.tanques()
     entregas_raw = Datos.entregas()
 
-    {entregas_validas, entregas_rechazadas} =procesar_entregas(entregas_raw, productores, tanques)
+    {entregas_validas, entregas_rechazadas} =
+      procesar_entregas(entregas_raw, productores, tanques)
 
     # solicitar entrega adicional (faltante)
-    # imprimir reportes R1 al R8 (faltante)
+
+    liquidaciones =
+      Enum.map(productores, fn p ->
+         liquidar_productor(p, entregas_validas)
+         end)
+
+   Reportes.generar_reportes(
+    entregas_validas,
+    entregas_rechazadas,
+    productores,
+    tanques,
+    liquidaciones
+    )
 
     solicitar_comprobante(productores, entregas_validas)
   end
