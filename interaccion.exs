@@ -18,7 +18,7 @@ defmodule Interaccion do
 
   def pedir_entrega_adicional do
     "Ingrese una entrega adicional (productor;tanque;dia;litros;grasa) o Enter para omitir: "
-    |> IO.gets()
+    |> Util.ingresar()
     |> procesar_entrada()
   end
 
