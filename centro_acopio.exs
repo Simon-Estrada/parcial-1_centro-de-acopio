@@ -23,7 +23,6 @@ defmodule CentroAcopio do
 
   """
   @tarifa_base 1800
-  @meta_diaria_centro 2000
   @dias_recepcion 1..6
   @max_litros_entrega 800
   @litros_bonificacion 450
