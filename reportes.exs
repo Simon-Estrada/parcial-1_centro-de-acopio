@@ -610,4 +610,27 @@ defmodule Reportes do
     |> Enum.map(fn {codigo, nombre} -> "#{nombre} (#{codigo})" end)
     |> Enum.join(", ")
   end
+
+  @doc """
+  Combina los registros de litros diarios de dos centros de acopio o reportes acumulados.
+
+  Si un día coincide en ambos mapas, se suman los litros de ambos lados mediante `Map.merge/3`.
+  Si un día solo aparece en uno de los mapas (como el día 7), conserva su valor intacto.
+
+  ## Parámetros:
+  - `centro_a`: Mapa con formato `%{dia => litros}`
+  - `centro_b`: Mapa con formato `%{dia => litros}`
+
+  ## Ejemplo:
+      iex> c1 = %{1 => 120.0, 7 => 95.0}
+      iex> c2 = %{1 => 80.0, 2 => 110.0}
+      iex> Reportes.combinar_litros_diarios(c1, c2)
+      %{1 => 200.0, 2 => 110.0, 7 => 95.0}
+  """
+  def combinar_litros_diarios(centro_a, centro_b) do
+    Map.merge(centro_a, centro_b, fn _dia, litros_a, litros_b ->
+      litros_a + litros_b
+    end)
+  end
+  
 end
