@@ -178,7 +178,8 @@ defmodule Reportes do
 
     Enum.each(filas, fn f ->
       Util.mostrar_mensaje(
-        "  #{f.nombre} (#{f.id}): #{f.litros} L | #{redondear(f.ocupacion)} % de ocupación"
+        "  #{f.nombre} (#{f.id}): #{texto_litros(f.litros)} L | " <>
+          "#{redondear(f.ocupacion)} % de ocupación"
       )
     end)
   end
@@ -244,7 +245,7 @@ defmodule Reportes do
 
     Enum.each(@dias_recepcion, fn dia ->
       estado = if cumple[dia], do: "cumple la meta", else: "no cumple la meta"
-      Util.mostrar_mensaje("  Día #{dia}: #{litros[dia]} L -> #{estado}")
+      Util.mostrar_mensaje("  Día #{dia}: #{texto_litros(litros[dia])} L -> #{estado}")
     end)
 
     Util.mostrar_mensaje("\n  ¿Se cumplió la meta todos los días? #{si_no(todos)}")
@@ -294,7 +295,7 @@ defmodule Reportes do
       nombre = String.pad_trailing(liq.productor.nombre, 20)
 
       Util.mostrar_mensaje(
-        "  #{posicion}. #{nombre} | #{liq.total_litros} L" <>
+        "  #{posicion}. #{nombre} | #{texto_litros(liq.total_litros)} L" <>
           " | Entregas: $#{Util.formatear_moneda(liq.total_valor_entregas)}" <>
           " | Bonif.: $#{Util.formatear_moneda(liq.total_bonificaciones)}" <>
           " | Transp.: -$#{Util.formatear_moneda(liq.descuento_transporte)}" <>
@@ -404,7 +405,9 @@ defmodule Reportes do
       if lideres == [] do
         Util.mostrar_mensaje("  Día #{dia}: sin entregas válidas")
       else
-        Util.mostrar_mensaje("  Día #{dia}: #{texto_lideres(lideres)} con #{litros} L")
+        Util.mostrar_mensaje(
+          "  Día #{dia}: #{texto_lideres(lideres)} con #{texto_litros(litros)} L"
+        )
       end
     end)
 
@@ -502,7 +505,7 @@ defmodule Reportes do
 
     Util.mostrar_mensaje(
       "  #{g.nombre} (#{g.codigo}): #{redondear(g.grasa_ponderada)} % de grasa ponderada " <>
-        "(#{g.entregas} entregas, #{g.litros} L)"
+        "(#{g.entregas} entregas, #{texto_litros(g.litros)} L)"
     )
   end
 
@@ -544,7 +547,7 @@ defmodule Reportes do
   def imprimir_r7(%{total_pagado: total, total_litros: litros, costo_por_litro: costo}) do
     Util.mostrar_mensaje("\n=== R7: TOTALES DE LA SEMANA ===")
     Util.mostrar_mensaje("  Total pagado por el centro: $#{Util.formatear_moneda(total)}")
-    Util.mostrar_mensaje("  Litros válidos recibidos  : #{litros} L")
+    Util.mostrar_mensaje("  Litros válidos recibidos  : #{texto_litros(litros)} L")
     Util.mostrar_mensaje("  Costo promedio por litro  : $#{Util.formatear_moneda(costo * 1.0)}")
   end
 
@@ -611,26 +614,13 @@ defmodule Reportes do
     |> Enum.join(", ")
   end
 
-  @doc """
-  Combina los registros de litros diarios de dos centros de acopio o reportes acumulados.
-
-  Si un día coincide en ambos mapas, se suman los litros de ambos lados mediante `Map.merge/3`.
-  Si un día solo aparece en uno de los mapas (como el día 7), conserva su valor intacto.
-
-  ## Parámetros:
-  - `centro_a`: Mapa con formato `%{dia => litros}`
-  - `centro_b`: Mapa con formato `%{dia => litros}`
-
-  ## Ejemplo:
-      iex> c1 = %{1 => 120.0, 7 => 95.0}
-      iex> c2 = %{1 => 80.0, 2 => 110.0}
-      iex> Reportes.combinar_litros_diarios(c1, c2)
-      %{1 => 200.0, 2 => 110.0, 7 => 95.0}
-  """
-  def combinar_litros_diarios(centro_a, centro_b) do
-    Map.merge(centro_a, centro_b, fn _dia, litros_a, litros_b ->
-      litros_a + litros_b
-    end)
+  # Muestra los litros sin ceros sobrantes: 2500.0 -> "2500", 599.5 -> "599.5".
+  # Sin esto, Elixir imprime 2500.0 en notación científica ("2.5e3").
+  defp texto_litros(litros) do
+    if litros == trunc(litros) do
+      litros |> trunc() |> Integer.to_string()
+    else
+      Float.to_string(litros)
+    end
   end
-  
 end
