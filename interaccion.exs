@@ -24,7 +24,7 @@ defmodule Interaccion do
 
   # Funciones privadas
 
-  #Captura caso de fin de archivo en consola (Ctrl+D)
+  # Captura caso de fin de archivo en consola (Ctrl+D)
   defp procesar_entrada(:eof), do: {:ok, :omitido}
 
   defp procesar_entrada(texto) do
@@ -34,7 +34,7 @@ defmodule Interaccion do
       {:ok, :omitido}
     else
       texto_limpio
-      |> String.split(";", trim: true)
+      |> String.split(";")
       |> parsear_campos()
     end
   end
@@ -44,11 +44,10 @@ defmodule Interaccion do
     with {dia, ""} <- parse_entero(str_dia),
          {litros, ""} <- parse_numero(str_litros),
          {grasa, ""} <- parse_numero(str_grasa) do
-
       # Mapa plano (sin defstruct)
       entrega = %{
-        productor: String.trim(prod),
-        tanque: String.trim(tanq),
+        productor: prod |> String.trim() |> String.upcase(),
+        tanque: tanq |> String.trim() |> String.upcase(),
         dia: dia,
         litros: litros,
         grasa: grasa
@@ -56,14 +55,6 @@ defmodule Interaccion do
 
       {:ok, entrega}
     else
-      _ -> {:error, :formato_invalido}
-    end
-  end
-
-  # Caso secundario: Si ingresan 4 campos separando litros y grasa por espacio ("320.5 3.6")
-  defp parsear_campos([prod, tanq, str_dia, str_litros_grasa]) do
-    case String.split(str_litros_grasa, ~r/\s+/, trim: true) do
-      [l, g] -> parsear_campos([prod, tanq, str_dia, l, g])
       _ -> {:error, :formato_invalido}
     end
   end
@@ -87,7 +78,9 @@ defmodule Interaccion do
     str_limpio = String.trim(str)
 
     case Float.parse(str_limpio) do
-      {num, ""} -> {num * 1.0, ""}
+      {num, ""} ->
+        {num * 1.0, ""}
+
       _ ->
         case Integer.parse(str_limpio) do
           {num, ""} -> {num * 1.0, ""}

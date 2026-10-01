@@ -52,8 +52,9 @@ defmodule CentroAcopio do
             {:error, motivo} ->
               {entregas_validas, [{motivo, entrega_extra} | entregas_rechazadas]}
           end
-        {:error, _motivo} ->
-          {entregas_validas, entregas_rechazadas}
+        {:error, motivo} ->
+      Util.mostrar_mensaje("Entrada ignorada: #{motivo}")
+      {entregas_validas, entregas_rechazadas}
       end
 
     liquidaciones =
