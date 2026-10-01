@@ -1,4 +1,5 @@
 Code.require_file("datos.exs")
+Code.require_file("interaccion.exs")
 Code.require_file("reportes.exs")
 
 defmodule CentroAcopio do
@@ -38,7 +39,23 @@ defmodule CentroAcopio do
     {entregas_validas, entregas_rechazadas} =
       procesar_entregas(entregas_raw, productores, tanques)
 
-    # solicitar entrega adicional (faltante)
+    # solicitar y procesar la entrega adicional por consola
+    {entregas_validas, entregas_rechazadas} =
+      case Interaccion.pedir_entrega_adicional() do
+        {:ok, :omitido} ->
+          {entregas_validas, entregas_rechazadas}
+
+        {:ok, entrega_extra} ->
+          case validar_entrega(entrega_extra, productores, tanques) do
+            {:ok, entrega_valida} ->
+              {[entrega_valida | entregas_validas], entregas_rechazadas}
+
+            {:error, motivo} ->
+              {entregas_validas, [{motivo, entrega_extra} | entregas_rechazadas]}
+          end
+        {:error, _motivo} ->
+          {entregas_validas, entregas_rechazadas}
+      end
 
     liquidaciones =
       Enum.map(productores, fn p ->
